@@ -7,12 +7,24 @@ class DoubleLink
 {
     private $head;
     private $tail;
+    private $len;
 
     public function __construct()
     {
         // 创建空头结点（Guard）
         $this->head = new Node(null);
         $this->tail = $this->head;
+        $this->len = 0;
+    }
+
+    public function first(): ?Node
+    {
+        return $this->isEmpty() ? null : $this->head->next();
+    }
+
+    public function last(): ?Node
+    {
+        return $this->isEmpty() ? null : $this->tail;
     }
 
     /**
@@ -20,10 +32,15 @@ class DoubleLink
      */
     public function append($content)
     {
-        $node = new Node($content);
+        $this->appendNode(new Node($content));
+    }
+
+    public function appendNode(Node $node)
+    {
         $this->tail->setNext($node);
         $node->setPrev($this->tail);
         $this->tail = $node;
+        $this->len++;
     }
 
     /**
@@ -31,13 +48,23 @@ class DoubleLink
      */
     public function unshift($content)
     {
-        $this->insertAfter($this->head, $content);
+        $this->insertAfterNode($this->head, $content);
+        $this->len++;
+    }
+
+    public function insertAfter($beforeContent, $content)
+    {
+        if (!$beforeNode = $this->find($beforeContent)) {
+            return;
+        }
+
+        $this->insertAfterNode($beforeNode, $content);
     }
 
     /**
      * 在某结点后面插入元素
      */
-    public function insertAfter(Node $beforeNode, $content)
+    public function insertAfterNode(Node $beforeNode, $content)
     {
         if ($beforeNode->next() === null) {
             return $this->append($content);
@@ -51,11 +78,13 @@ class DoubleLink
         // 将 next 的 prev 指向该元素
         $node->next()->setPrev($node);
 
-        // 再建立当前元素和 beforeNode 的关系
+        // 再建立当前元素和 prev 的关系
         // 将 beforeNode 的 next 指向该元素
         $beforeNode->setNext($node);
         // 将当前元素的 prev 指向 beforeNode
         $node->setPrev($beforeNode);
+
+        $this->len++;
     }
 
     /**
@@ -106,14 +135,24 @@ class DoubleLink
             // 删除的是尾部节点，需要修改 tail
             $this->tail = $node->prev();
         }
+
+        $this->len--;
     }
 
     public function isEmpty(): bool
     {
-        return $this->head->next() === null;
+        return $this->len === 0;
+    }
+
+    public function length(): int
+    {
+        return $this->len;
     }
 }
 
+/**
+ * 链表节点
+ */
 class Node
 {
     private $content;
