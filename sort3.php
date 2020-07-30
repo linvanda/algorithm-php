@@ -24,7 +24,7 @@ include_once './sort_test.php';
      * 数值 x 应放入第 x / k + 1 个桶，如果该位置超过桶范围，则放入最后一个桶中
      */
     $m = $max < 500 ? 1 : 500;
-    $k = intval($max / $m);
+    $k = intdiv($max, $m);
     // 初始化桶
     $bucket = [];
     for($i = 0; $i < $m; $i++) {
@@ -33,7 +33,7 @@ include_once './sort_test.php';
 
     // 遍历源数组，将元素放入合适的桶中
     foreach ($arr as $item) {
-        $idx = min(intval($item / $k), $m - 1);
+        $idx = min(intdiv($item, $k), $m - 1);
         $bucket[$idx][] = $item;
     }
 
