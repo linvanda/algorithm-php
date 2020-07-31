@@ -17,6 +17,14 @@ class DoubleLink
         $this->len = 0;
     }
 
+    /**
+     * 双向链表的结点之间存在循环依赖，需要手动清理结点
+     */
+    public function __destruct()
+    {
+        $this->removeAll();
+    }
+
     public function first(): ?Node
     {
         return $this->isEmpty() ? null : $this->head->next();
@@ -49,7 +57,23 @@ class DoubleLink
     public function unshift($content)
     {
         $this->insertAfterNode($this->head, $content);
-        $this->len++;
+    }
+
+    public function replaceNode(Node $old, Node $new)
+    {
+        if ($new === null) {
+            return $this->removeNode($old);
+        }
+
+        $new->setPrev($old->prev());
+        $new->prev()->setNext($new);
+
+        if ($old->next()) {
+            $new->setNext($old->next());
+            $new->next()->setPrev($new);
+        } else {
+            $this->tail = $new;
+        }
     }
 
     public function insertAfter($beforeContent, $content)
@@ -102,6 +126,25 @@ class DoubleLink
         }
 
         return null;
+    }
+
+    /**
+     * 删除所有结点
+     */
+    public function removeAll()
+    {
+        if ($this->isEmpty()) {
+            return;
+        }
+
+        // 先切断所有的 prev 指针，然后切断结点和 head 的关联，这样所有的结点都会被 gc 回收
+        while ($this->tail !== $this->head) {
+            $this->tail = $this->tail->prev();
+            $this->tail->next()->setPrev(null);
+        }
+
+        $this->head->setNext(null);
+        $this->len = 0;
     }
 
     /**
