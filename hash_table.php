@@ -6,19 +6,21 @@ include_once './double_link.php';
  * 散列表
  * 简单起见，此处只支持字符串或整型作为 Key
  * 内部使用数组做散列映射，用链表解决 hash 冲突
+ * 每次 set 元素时，都会检查是否需要扩容
+ * 扩容后，旧表仍然保留，后面每次 set 都会从旧表搬迁部分数据到新表，防止一次搬迁造成卡顿
  */
 class HashTable
 {
     // 数组
-    private $table;
+    public $table;
     // 数组扩容时尚未完全废弃的老 Table
-    private $oldTable;
+    public $oldTable;
     // 旧表迁移指针
     private $oldPoint;
     // 数组容量
-    private $capacity;
+    public $capacity;
     // 数组使用量
-    private $used;
+    public $used;
     // 元素总数
     private $count;
     // 装载因子因，超过该值将触发数组扩容
@@ -95,10 +97,20 @@ class HashTable
         }
 
         // 普通节点
-        if ($node instanceof HashNode && $node->key() === $key) {
-            unset($table[$index]);
-            $this->count--;
-            return true;
+        if ($node instanceof HashNode) {
+            if ($node->key() === $key) {
+                unset($table[$index]);
+                $this->count--;
+
+                if ($table === $this->table) {
+                    // 如果是从新表删除，需要扣减 used
+                    $this->used--;
+                }
+
+                return true;
+            }
+            
+            return false;
         }
 
         // 链表
@@ -107,6 +119,16 @@ class HashTable
             if ($current->key() === $key) {
                 $node->removeNode($current);
                 $this->count--;
+
+                if ($node->isEmpty()) {
+                    // 链表空了，删除该链表
+                    unset($table[$index]);
+                    if ($table === $this->table) {
+                        // 如果是从新表删除，需要扣减 used
+                        $this->used--;
+                    }
+                }
+
                 return true;
             }
             $current = $current->next();
@@ -143,9 +165,10 @@ class HashTable
      */
     private function newTable(int $capacity)
     {
-        $this->capacity = $capacity = $capacity > 0 && $capacity & ($capacity - 1) === 0 ? $capacity : 16;
+        // 注意 & 运算比比较运算优先级低
+        $this->capacity = $capacity > 0 && ($capacity & ($capacity - 1)) === 0 ? $capacity : 16;
         $this->used = 0;
-        $this->table = new SplFixedArray($capacity);
+        $this->table = new SplFixedArray($this->capacity);
     }
 
     private function tryToExtend($key)
@@ -211,6 +234,9 @@ class HashTable
         }
     }
 
+    /**
+     * 从新表迁移到旧表
+     */
     private function moveToNewTable($index): bool
     {
         $node = $this->oldTable[$index] ?? null;
@@ -220,13 +246,19 @@ class HashTable
 
         if ($node instanceof HashNode) {
             // 普通的 hash 节点，直接迁移
-            $this->addToTable($node);
+            $this->addToTable($node, true);
         } elseif ($node instanceof DoubleLink) {
             // 链表，遍历迁移（里面的每个元素的 hash 值不一定相同，因而在新表的位置不一定相同）
-            $current = $node->first();
-            while ($current) {
-                $this->addToTable($current);
-                $current = $current->next();
+            $current = $node->last();
+            while (!$node->isEmpty()) {
+                // 注意下面的操作顺序，在两个链表之间转移元素，需要谨慎，防止指针错误指向
+                $currNode = $current;
+                // 指针前移
+                $current = $current->prev();
+                // 从当前链表中删除该结点
+                $node->removeNode($currNode);
+                // 添加到新表中
+                $this->addToTable($currNode, true);
             }
         }
 
@@ -237,8 +269,10 @@ class HashTable
     /**
      * 将节点添加到 hash 表中
      * 我们假设 hash 冲突是效率概率事件，因而优先直接存储 hash 节点，当遇到冲突时才转换成双向链表
+     * @param $node HashNode 待添加的结点
+     * @param $isMove bool 是否从旧表迁移过来的
      */
-    private function addToTable(HashNode $node)
+    private function addToTable(HashNode $node, $isMove = false)
     {
         $idx = $this->index($node->key());
         $currentEle = $this->table[$idx];
@@ -246,7 +280,7 @@ class HashTable
             // 当前位置没有元素，直接插入
             $this->table[$idx] = $node;
             $this->used++;
-            $this->count++;
+            !$isMove && $this->count++;
         } elseif ($currentEle instanceof DoubleLink) {
             // 当前位置是双向链表
             $curr = $currentEle->first();
@@ -257,11 +291,12 @@ class HashTable
                     $currentEle->replaceNode($curr, $node);
                     return;
                 }
+                $curr = $curr->next();
             }
 
             // 追加
-            $currentEle->append($node);
-            $this->count++;
+            $currentEle->appendNode($node);
+            !$isMove && $this->count++;
         } else {
             // 当前位置是一个普通元素节点
             if ($node->key() === $currentEle->key()) {
@@ -270,10 +305,10 @@ class HashTable
             } else {
                 // 转换为双向链表
                 $dlink = new DoubleLink();
-                $dlink->append($currentEle);
-                $dlink->append($node);
+                $dlink->appendNode($currentEle);
+                $dlink->appendNode($node);
                 $this->table[$idx] = $dlink;
-                $this->count++;
+                !$isMove && $this->count++;
             }
         }
     }
@@ -316,3 +351,36 @@ class HashNode extends Node
         return $this->key;
     }
 }
+
+// --- test ---
+// $ht = new HashTable();
+// $ht->set("add", 34);
+
+// for ($i = 0; $i < 12290; $i++) {
+//     $ht->set("k{$i}", $i * 3);
+// }
+
+// for ($i = 0; $i < 12180; $i++) {
+//     $ht->remove("k{$i}");
+// }
+// echo "used:".$ht->used;
+
+// $ht->remove('add');
+// echo "total:".$ht->count()."\n";
+// echo "cap:{$ht->capacity}\n";
+// echo "get:" . $ht->get("add")."\n";
+// $ht->set("add", 100);
+// echo "get again:" . $ht->get("add")."\n";
+
+// $cnt = 0;
+// $max = 0;
+// foreach ($ht->table as $item) {
+//     if ($item instanceof DoubleLink) {
+//         $cnt++;
+//         $max = max($max, $item->length());
+//     }
+// }
+// echo "cnt:$cnt,max:$max\n";
+
+// one:k2253two:k12283, one:k2255two:k12285
+// echo (sprintf('%u', crc32('k2253'))%16384).','.(sprintf('%u', crc32('k12283'))%16384);

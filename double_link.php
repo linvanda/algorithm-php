@@ -47,6 +47,8 @@ class DoubleLink
     {
         $this->tail->setNext($node);
         $node->setPrev($this->tail);
+        // 将 next 指针置空，防止指向其他地方了
+        $node->setNext(null);
         $this->tail = $node;
         $this->len++;
     }
@@ -66,11 +68,11 @@ class DoubleLink
         }
 
         $new->setPrev($old->prev());
-        $new->prev()->setNext($new);
+        $old->prev()->setNext($new);
 
         if ($old->next()) {
             $new->setNext($old->next());
-            $new->next()->setPrev($new);
+            $old->next()->setPrev($new);
         } else {
             $this->tail = $new;
         }
@@ -82,19 +84,17 @@ class DoubleLink
             return;
         }
 
-        $this->insertAfterNode($beforeNode, $content);
+        $this->insertAfterNode($beforeNode, new Node($content));
     }
 
     /**
      * 在某结点后面插入元素
      */
-    public function insertAfterNode(Node $beforeNode, $content)
+    public function insertAfterNode(Node $beforeNode, Node $node)
     {
         if ($beforeNode->next() === null) {
-            return $this->append($content);
+            return $this->appendNode($node);
         }
-
-        $node = new Node($content);
 
         // 先建立当前元素和 next 的关系
         // 将该元素的 next 指向 beforeNode 的 next
