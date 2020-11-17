@@ -5,29 +5,29 @@ include_once './double_link.php';
 /**
  * 散列表
  * 简单起见，此处只支持字符串或整型作为 Key
- * 内部使用数组做散列映射，用链表解决 hash 冲突
+ * 内部使用数组做散列映射，用链表解决 hash 冲突（优化点：当链表长度达到一定后，将链表转成跳表或者红黑树）
  * 每次 set 元素时，都会检查是否需要扩容
  * 扩容后，旧表仍然保留，后面每次 set 都会从旧表搬迁部分数据到新表，防止一次搬迁造成卡顿
  */
 class HashTable
 {
     // 数组
-    public $table;
+    private $table;
     // 数组扩容时尚未完全废弃的老 Table
-    public $oldTable;
+    private $oldTable;
     // 旧表迁移指针
     private $oldPoint;
     // 数组容量
-    public $capacity;
+    private $capacity;
     // 数组使用量
-    public $used;
+    private $used;
     // 元素总数
     private $count;
     // 装载因子因，超过该值将触发数组扩容
     private $threshold;
 
     /**
-     * $capacity int 必须是 2 的次方数
+     * @param int $capacity 必须是 2 的次方数
      */
     public function __construct(int $capacity = 16, float $trheshold = 0.75)
     {
@@ -46,9 +46,17 @@ class HashTable
             return $this->remove($key);
         }
 
+        $this->setNode($key, new HashNode($key, $val));   
+    }
+
+    /**
+     * 该接口对外暴露为了后面做 cache 使用
+     */
+    public function setNode($key, HashNode $node)
+    {
         // 首先看看是否需要扩容
         $this->tryToExtend($key);
-        $this->addToTable(new HashNode($key, $val));
+        $this->addToTable($node);
     }
 
     /**
@@ -269,8 +277,8 @@ class HashTable
     /**
      * 将节点添加到 hash 表中
      * 我们假设 hash 冲突是效率概率事件，因而优先直接存储 hash 节点，当遇到冲突时才转换成双向链表
-     * @param $node HashNode 待添加的结点
-     * @param $isMove bool 是否从旧表迁移过来的
+     * @param HashNode $node 待添加的结点
+     * @param bool $isMove 是否从旧表迁移过来的
      */
     private function addToTable(HashNode $node, $isMove = false)
     {
@@ -354,9 +362,8 @@ class HashNode extends Node
 
 // --- test ---
 // $ht = new HashTable();
-// $ht->set("add", 34);
 
-// for ($i = 0; $i < 12290; $i++) {
+// for ($i = 0; $i < 1229000; $i++) {
 //     $ht->set("k{$i}", $i * 3);
 // }
 
