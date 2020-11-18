@@ -15,7 +15,7 @@ interface IComparable
  abstract class Heap
 {
     /**
-     * 为了方便使用，数据下标从 1 开始使用
+     * 为了方便使用，数组下标从 1 开始使用
      * $data 中存放 IComparable 对象
      */
     protected $data;

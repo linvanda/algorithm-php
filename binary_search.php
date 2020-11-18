@@ -126,13 +126,13 @@ function last_leq_bsearch(SplFixedArray $arr, $need): int
 }
 
 
-$size = 500000;
-$arr = new SplFixedArray($size);
-// for ($i = 0; $i < $size; $i++) {
-//     $arr[$i] = $i % 2 ? $i : $i - 1;
-// }
-$arr = SplFixedArray::fromArray([1,2,3,3,5,5,6]);
+// $size = 500000;
+// $arr = new SplFixedArray($size);
+// // for ($i = 0; $i < $size; $i++) {
+// //     $arr[$i] = $i % 2 ? $i : $i - 1;
+// // }
+// $arr = SplFixedArray::fromArray([1,2,3,3,5,5,6]);
 
-// test('first_eq_bsearch', 'first_eq_bsearch', $arr, 400000);
-echo last_leq_bsearch($arr, 4);
+// // test('first_eq_bsearch', 'first_eq_bsearch', $arr, 400000);
+// echo last_leq_bsearch($arr, 4);
 
