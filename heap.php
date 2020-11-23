@@ -122,7 +122,7 @@ interface IComparable
             return;
         }
 
-        // 对新的结点执行下沉操作
+        // 对新的结点执行up操作
         $this->up($pIndex);
     }
 

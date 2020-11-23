@@ -1,5 +1,7 @@
 <?php
 
+include './ordered_array.php';
+
 /**
  * trie 树（字典树）
  * trie 树属于 n 叉树，这里我们用有序数组存储子节点（也可以用其他数据结构如跳表）
@@ -121,7 +123,7 @@
 
         // 有子节点，则继续处理子节点
         // 深度优先遍历
-        $children = $node->children()->data();
+        $children = $node->children();
         foreach ($children as $childNode) {
             $this->getAllWords($childNode, $prefix, $arr);
         }
@@ -131,7 +133,7 @@
  /**
   * 节点
   */ 
- class Node
+ class Node implements IComparable
  {
      private $char;
      private $wordFreq;// 单词出现的频率（次数）
@@ -142,6 +144,20 @@
         $this->char = $char;
         $this->wordFreq = 0;
         $this->children = new OrderedArray();
+    }
+
+    public function compare(IComparable $other): int
+    {
+        if (!$other instanceof Node) {
+            throw new \Exception("invalid op");
+        }
+
+        $otherChar = $other->char();
+        if ($otherChar === $this->char) {
+            return 0;
+        }
+
+        return $this->char > $otherChar ? 1 : -1;
     }
 
     public function char(): string
@@ -183,17 +199,7 @@
      */
     public function getOrAddChild(string $char): Node
     {
-        $pos = $this->children->lastLeq($char);
-        if ($pos !== -1 && $this->children->get($pos)->char() === $char) {
-            // 已存在，直接返回
-            return $this->children->get($pos);
-        }
-
-        // 不存在，创建并插入
-        $node = new Node($char);
-        $this->children->insert($node, $pos + 1);
-
-        return $node;
+        return $this->children->getOrAdd(new Node($char));
     }
 
     /**
@@ -201,110 +207,11 @@
      */
     public function getChild(string $char): ?Node
     {
-        if (($index = $this->children->search($char)) !== -1) {
+        if (($index = $this->children->search(new Node($char))) !== -1) {
             return $this->children->get($index);
         }
 
         return null;
-    }
- }
-
- /**
-  * 有序数组
-  * 数组中元素根据字符大小升序排列
-  * 有序数组查找元素很快，但插入元素可能需要移位，适用于数据量不太大，查询很频繁的场景
-  */
- class OrderedArray
- {
-    private $data;
-
-    public function __construct()
-    {
-        $this->data = [];
-    }
-
-    public function get(int $index): ?Node
-    {
-        return $this->data[$index] ?? null;
-    }
-
-    public function size(): int
-    {
-        return count($this->data);
-    }
-
-    public function data(): array
-    {
-        return $this->data;
-    }
-
-    /**
-     * 在 $pos 处插入元素
-     */
-    public function insert(Node $node, int $pos)
-    {
-        if (!$this->data) {
-            $this->data[] = $node;
-            return;
-        }
-
-        // 先将 $pos 以及后面的元素往后移动一位
-        for ($i = count($this->data) - 1; $i >= $pos; $i--) {
-            $this->data[$i + 1] = $this->data[$i];
-        }
-
-        // 将 $node 插入到 $pos 的位置
-        $this->data[$pos] = $node;
-    }
-
-    /**
-     * 找出最后一个小于等于目标值的元素位置
-     * @return int 返回符合条件的下标，如果所有元素都大于 $need，则返回 -1
-     */
-    public function lastLeq(string $char): int
-    {
-        $arr = $this->data;
-        $cnt = count($arr);
-        $low = 0;
-        $high = $cnt - 1;
-        while ($low <= $high) {
-            $mid = $low + (($high - $low) >> 1);
-            if ($arr[$mid]->char() > $char) {
-                $high = $mid - 1;
-            } else {
-                if ($mid === $cnt - 1 || $arr[$mid + 1]->char() > $char) {
-                    return $mid;
-                }
-
-                $low = $mid + 1;
-            }
-        }
-
-        return -1;
-    }
-
-    /**
-     * 查找 $char 所在的位置，如果没有，则返回 -1
-     */
-    public function search(string $char): int
-    {
-        $arr = $this->data;
-        $cnt = count($arr);
-        $low = 0;
-        $high = $cnt - 1;
-        while ($low <= $high) {
-            $mid = $low + (($high - $low) >> 1);
-            $val = $arr[$mid]->char();
-            if ($val === $char) {
-                return $mid;
-            } elseif ($val > $char) {
-                $high = $mid - 1;
-            } else {
-                $low = $mid + 1;
-            }
-        }
-
-        return -1;
     }
  }
 
